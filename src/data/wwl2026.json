@@ -1,0 +1,359 @@
+{
+ "list": "Open Doors World Watch List 2026",
+ "published": "January 2026",
+ "scale": "Extreme 81-100, Very high 61-80, High 41-60 (this file covers ranks 1-50 only)",
+ "source": "https://www.opendoors.org/persecution/countries/",
+ "note": "Static transcription of the official Top 50 table; scores are totals out of 100.",
+ "countries": [
+  {
+   "rank": 1,
+   "country": "North Korea",
+   "iso2": "KP",
+   "score": 97,
+   "category": "extreme"
+  },
+  {
+   "rank": 2,
+   "country": "Somalia",
+   "iso2": "SO",
+   "score": 94,
+   "category": "extreme"
+  },
+  {
+   "rank": 3,
+   "country": "Yemen",
+   "iso2": "YE",
+   "score": 93,
+   "category": "extreme"
+  },
+  {
+   "rank": 4,
+   "country": "Sudan",
+   "iso2": "SD",
+   "score": 92,
+   "category": "extreme"
+  },
+  {
+   "rank": 5,
+   "country": "Eritrea",
+   "iso2": "ER",
+   "score": 90,
+   "category": "extreme"
+  },
+  {
+   "rank": 6,
+   "country": "Syria",
+   "iso2": "SY",
+   "score": 90,
+   "category": "extreme"
+  },
+  {
+   "rank": 7,
+   "country": "Nigeria",
+   "iso2": "NG",
+   "score": 89,
+   "category": "extreme"
+  },
+  {
+   "rank": 8,
+   "country": "Pakistan",
+   "iso2": "PK",
+   "score": 87,
+   "category": "extreme"
+  },
+  {
+   "rank": 9,
+   "country": "Libya",
+   "iso2": "LY",
+   "score": 87,
+   "category": "extreme"
+  },
+  {
+   "rank": 10,
+   "country": "Iran",
+   "iso2": "IR",
+   "score": 87,
+   "category": "extreme"
+  },
+  {
+   "rank": 11,
+   "country": "Afghanistan",
+   "iso2": "AF",
+   "score": 86,
+   "category": "extreme"
+  },
+  {
+   "rank": 12,
+   "country": "India",
+   "iso2": "IN",
+   "score": 84,
+   "category": "extreme"
+  },
+  {
+   "rank": 13,
+   "country": "Saudi Arabia",
+   "iso2": "SA",
+   "score": 82,
+   "category": "extreme"
+  },
+  {
+   "rank": 14,
+   "country": "Myanmar",
+   "iso2": "MM",
+   "score": 81,
+   "category": "extreme"
+  },
+  {
+   "rank": 15,
+   "country": "Mali",
+   "iso2": "ML",
+   "score": 81,
+   "category": "extreme"
+  },
+  {
+   "rank": 16,
+   "country": "Burkina Faso",
+   "iso2": "BF",
+   "score": 80,
+   "category": "very_high"
+  },
+  {
+   "rank": 17,
+   "country": "China",
+   "iso2": "CN",
+   "score": 79,
+   "category": "very_high"
+  },
+  {
+   "rank": 18,
+   "country": "Iraq",
+   "iso2": "IQ",
+   "score": 79,
+   "category": "very_high"
+  },
+  {
+   "rank": 19,
+   "country": "Maldives",
+   "iso2": "MV",
+   "score": 79,
+   "category": "very_high"
+  },
+  {
+   "rank": 20,
+   "country": "Algeria",
+   "iso2": "DZ",
+   "score": 77,
+   "category": "very_high"
+  },
+  {
+   "rank": 21,
+   "country": "Mauritania",
+   "iso2": "MR",
+   "score": 76,
+   "category": "very_high"
+  },
+  {
+   "rank": 22,
+   "country": "Central African Republic",
+   "iso2": "CF",
+   "score": 75,
+   "category": "very_high"
+  },
+  {
+   "rank": 23,
+   "country": "Morocco",
+   "iso2": "MA",
+   "score": 75,
+   "category": "very_high"
+  },
+  {
+   "rank": 24,
+   "country": "Cuba",
+   "iso2": "CU",
+   "score": 73,
+   "category": "very_high"
+  },
+  {
+   "rank": 25,
+   "country": "Uzbekistan",
+   "iso2": "UZ",
+   "score": 73,
+   "category": "very_high"
+  },
+  {
+   "rank": 26,
+   "country": "Niger",
+   "iso2": "NE",
+   "score": 72,
+   "category": "very_high"
+  },
+  {
+   "rank": 27,
+   "country": "Tajikistan",
+   "iso2": "TJ",
+   "score": 72,
+   "category": "very_high"
+  },
+  {
+   "rank": 28,
+   "country": "Laos",
+   "iso2": "LA",
+   "score": 72,
+   "category": "very_high"
+  },
+  {
+   "rank": 29,
+   "country": "DR Congo",
+   "iso2": "CD",
+   "score": 72,
+   "category": "very_high"
+  },
+  {
+   "rank": 30,
+   "country": "Mexico",
+   "iso2": "MX",
+   "score": 71,
+   "category": "very_high"
+  },
+  {
+   "rank": 31,
+   "country": "Tunisia",
+   "iso2": "TN",
+   "score": 71,
+   "category": "very_high"
+  },
+  {
+   "rank": 32,
+   "country": "Nicaragua",
+   "iso2": "NI",
+   "score": 71,
+   "category": "very_high"
+  },
+  {
+   "rank": 33,
+   "country": "Bangladesh",
+   "iso2": "BD",
+   "score": 71,
+   "category": "very_high"
+  },
+  {
+   "rank": 34,
+   "country": "Bhutan",
+   "iso2": "BT",
+   "score": 71,
+   "category": "very_high"
+  },
+  {
+   "rank": 35,
+   "country": "Turkmenistan",
+   "iso2": "TM",
+   "score": 71,
+   "category": "very_high"
+  },
+  {
+   "rank": 36,
+   "country": "Ethiopia",
+   "iso2": "ET",
+   "score": 70,
+   "category": "very_high"
+  },
+  {
+   "rank": 37,
+   "country": "Cameroon",
+   "iso2": "CM",
+   "score": 70,
+   "category": "very_high"
+  },
+  {
+   "rank": 38,
+   "country": "Oman",
+   "iso2": "OM",
+   "score": 70,
+   "category": "very_high"
+  },
+  {
+   "rank": 39,
+   "country": "Mozambique",
+   "iso2": "MZ",
+   "score": 69,
+   "category": "very_high"
+  },
+  {
+   "rank": 40,
+   "country": "Kyrgyzstan",
+   "iso2": "KG",
+   "score": 68,
+   "category": "very_high"
+  },
+  {
+   "rank": 41,
+   "country": "Turkey",
+   "iso2": "TR",
+   "score": 68,
+   "category": "very_high"
+  },
+  {
+   "rank": 42,
+   "country": "Egypt",
+   "iso2": "EG",
+   "score": 68,
+   "category": "very_high"
+  },
+  {
+   "rank": 43,
+   "country": "Comoros",
+   "iso2": "KM",
+   "score": 68,
+   "category": "very_high"
+  },
+  {
+   "rank": 44,
+   "country": "Qatar",
+   "iso2": "QA",
+   "score": 67,
+   "category": "very_high"
+  },
+  {
+   "rank": 45,
+   "country": "Kazakhstan",
+   "iso2": "KZ",
+   "score": 67,
+   "category": "very_high"
+  },
+  {
+   "rank": 46,
+   "country": "Nepal",
+   "iso2": "NP",
+   "score": 67,
+   "category": "very_high"
+  },
+  {
+   "rank": 47,
+   "country": "Colombia",
+   "iso2": "CO",
+   "score": 66,
+   "category": "very_high"
+  },
+  {
+   "rank": 48,
+   "country": "Chad",
+   "iso2": "TD",
+   "score": 66,
+   "category": "very_high"
+  },
+  {
+   "rank": 49,
+   "country": "Jordan",
+   "iso2": "JO",
+   "score": 65,
+   "category": "very_high"
+  },
+  {
+   "rank": 50,
+   "country": "Brunei",
+   "iso2": "BN",
+   "score": 65,
+   "category": "very_high"
+  }
+ ]
+}

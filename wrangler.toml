@@ -1,0 +1,36 @@
+# Cloudflare Worker for the SBC Prayer Console. Deploy with:  npx wrangler deploy   (see DEPLOY.md)
+name = "sbc-prayer-console"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+# --- Static front end (public/) served by Workers static assets (free, unlimited requests).
+# run_worker_first sends only /api/* to the Worker script; everything else is served straight from the assets.
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = ["/api/*"]
+
+# --- KV cache (free tier: 100k reads/day, 1k writes/day). Holds feed caches + throttle state.
+# 1) run:  npx wrangler kv namespace create CACHE
+# 2) paste the printed id below (replace c265cebd0507423fb248a3eea0c5b47b). Local `wrangler dev` works with the placeholder.
+[[kv_namespaces]]
+binding = "CACHE"
+id = "c265cebd0507423fb248a3eea0c5b47b"
+
+# --- Cron Trigger: refresh feeds. Each run refreshes only the single most-overdue source (CRON_MAX_SOURCES=1) and only
+# if that source is past its own TTL (30-180 min), so upstream sites are never hit more often than their TTL / Crawl-delay.
+# Why every 5 min instead of 30: the free plan allows 10 ms CPU per invocation, so one source per run; 8 sources whose TTLs add
+# up to ~9 refreshes/hour need >= 10 runs/hour. On the Paid plan you can use "*/30 * * * *" with CRON_MAX_SOURCES = "8".
+[triggers]
+crons = ["*/5 * * * *"]
+
+[vars]
+TZ = "America/Chicago"          # default "today" for /api/today when no ?date= is given
+CONTACT_URL = ""                # optional: your church site/e-mail, appended to the User-Agent so publishers can reach you
+# CRON_MAX_SOURCES = "1"        # sources refreshed per cron run (default 1 = safest for the free plan's 10 ms CPU limit)
+# REFRESH_MAX_SOURCES = "2"     # sources refreshed per POST /api/refresh (default 2 = free-plan safe; use "8" on the Paid plan)
+
+# Optional secret (not here):  npx wrangler secret put JP_API_KEY    (free Joshua Project API key)
+
+[observability]
+enabled = true

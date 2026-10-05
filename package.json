@@ -1,0 +1,20 @@
+{
+  "name": "sbc-prayer-worker",
+  "version": "0.1.0",
+  "description": "Missionary Status & Prayer Console (SBC-focused) as a Cloudflare Worker (free tier): Workers static assets + KV + Cron Trigger",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "build:data": "node scripts/build-countries.mjs",
+    "check": "node --check src/index.js"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^5.11.2"
+  },
+  "devDependencies": {
+    "wrangler": "^4"
+  },
+  "license": "UNLICENSED"
+}

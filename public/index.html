@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Missionary Status &amp; Prayer Console</title>
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <h1>Missionary Status &amp; Prayer Console</h1>
+    <p class="sub">Southern Baptist focus · praying with intention for missionaries, unreached peoples &amp; the persecuted church</p>
+  </div>
+  <div class="controls">
+    <button id="btn-refresh" title="Re-fetch all sources now">⟳ Refresh</button>
+    <label class="chk" title="Re-pull from the server every 15 minutes"><input type="checkbox" id="auto-refresh"> Auto (15 min)</label>
+    <label class="chk" title="Larger type, dark theme for the sanctuary screen"><input type="checkbox" id="projector"> Projector mode</label>
+    <label class="chk" title="Hide missionaries flagged sensitive from the map and screen"><input type="checkbox" id="privacy" checked> Privacy mode</label>
+    <span id="updated" class="muted" aria-live="polite"></span>
+  </div>
+</header>
+<div id="banner" class="banner" hidden></div>
+
+<main class="layout">
+  <section class="mapwrap" aria-label="World map">
+    <div id="map" role="application" aria-label="Interactive prayer map"></div>
+    <div class="layers" id="layers">
+      <strong>Map layers</strong>
+      <label><input type="checkbox" data-layer="wwl" checked> Persecution level (Open Doors WWL 2026)</label>
+      <label><input type="checkbox" data-layer="news" checked> Prayer items from feeds</label>
+      <label><input type="checkbox" data-layer="church" checked> Our church's missionaries</label>
+      <label><input type="checkbox" data-layer="jp" checked> Unreached people of the day</label>
+    </div>
+    <div class="legend" id="legend">
+      <span><i style="background:#7f1d1d"></i>Extreme (81-100)</span>
+      <span><i style="background:#ea580c"></i>Very high (61-80)</span>
+      <span><i style="background:#dcd6c8"></i>Not in WWL top 50</span>
+      <span><i class="dot rd"></i>persecution news</span>
+      <span><i class="dot bl"></i>missions news</span>
+      <span><i class="dot gr"></i>church missionary</span>
+      <span><i class="dot pu"></i>unreached of the day</span>
+    </div>
+  </section>
+
+  <section class="panel">
+    <nav class="tabs" role="tablist" id="tabs">
+      <button role="tab" data-tab="today" class="on">Today</button>
+      <button role="tab" data-tab="country" id="tab-country" hidden>Country</button>
+      <button role="tab" data-tab="persecution">Persecuted Church</button>
+      <button role="tab" data-tab="missions">Missions</button>
+      <button role="tab" data-tab="sbc">SBC News</button>
+      <button role="tab" data-tab="prayer">Prayer List <span id="pl-count" class="pill"></span></button>
+      <button role="tab" data-tab="church">Our Missionaries</button>
+      <button role="tab" data-tab="sources">Sources</button>
+    </nav>
+    <div id="view" class="view" tabindex="-1"></div>
+  </section>
+</main>
+
+<footer class="foot">
+  <span>Data: IMB, NAMB, Baptist Press, SBC.net, International Christian Concern, Morning Star News, Release International (RSS headlines &amp; links) ·
+  <a href="https://joshuaproject.net/" target="_blank" rel="noopener">Data provided by Joshua Project</a> ·
+  World Watch List © <a href="https://www.opendoors.org/" target="_blank" rel="noopener">Open Doors International</a> · Map © OpenStreetMap contributors · Natural Earth · Leaflet</span>
+  <span class="muted">Individual field-worker data is intentionally not collected: mission boards withhold it for security. "Our Missionaries" is entered and stored by you, in this browser only.</span>
+</footer>
+<script src="vendor/leaflet/leaflet.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
