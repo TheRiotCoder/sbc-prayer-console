@@ -1,9 +1,9 @@
 {
  "list": "Open Doors World Watch List 2026",
  "published": "January 2026",
- "scale": "Extreme 81-100, Very high 61-80, High 41-60 (this file covers ranks 1-50 only)",
- "source": "https://www.opendoors.org/persecution/countries/",
- "note": "Static transcription of the official Top 50 table; scores are totals out of 100.",
+ "scale": "Extreme 81-100, Very high 61-80, High 41-60 (this file covers ranks 1-75, all countries scoring 50+)",
+ "source": "https://www.opendoors.org/research-reports/wwl-documentation/",
+ "note": "Static transcription of the official Open Doors table of countries scoring 50+ points; scores are totals out of 100. Non-commercial church use; not endorsed by Open Doors. Reporting period 1 Oct 2024 \u2013 30 Sep 2025; published Jan 2026.",
  "countries": [
   {
    "rank": 1,
@@ -354,6 +354,190 @@
    "iso2": "BN",
    "score": 65,
    "category": "very_high"
+  },
+  {
+   "rank": 51,
+   "country": "Malaysia",
+   "iso2": "MY",
+   "score": 65,
+   "category": "very_high"
+  },
+  {
+   "rank": 52,
+   "country": "Azerbaijan",
+   "iso2": "AZ",
+   "score": 65,
+   "category": "very_high"
+  },
+  {
+   "rank": 53,
+   "country": "Tanzania",
+   "iso2": "TZ",
+   "score": 64,
+   "category": "very_high"
+  },
+  {
+   "rank": 54,
+   "country": "Kenya",
+   "iso2": "KE",
+   "score": 64,
+   "category": "very_high"
+  },
+  {
+   "rank": 55,
+   "country": "Vietnam",
+   "iso2": "VN",
+   "score": 64,
+   "category": "very_high"
+  },
+  {
+   "rank": 56,
+   "country": "Russia",
+   "iso2": "RU",
+   "score": 63,
+   "category": "very_high"
+  },
+  {
+   "rank": 57,
+   "country": "United Arab Emirates",
+   "iso2": "AE",
+   "score": 63,
+   "category": "very_high"
+  },
+  {
+   "rank": 58,
+   "country": "Djibouti",
+   "iso2": "DJ",
+   "score": 62,
+   "category": "very_high"
+  },
+  {
+   "rank": 59,
+   "country": "Indonesia",
+   "iso2": "ID",
+   "score": 62,
+   "category": "very_high"
+  },
+  {
+   "rank": 60,
+   "country": "Kuwait",
+   "iso2": "KW",
+   "score": 61,
+   "category": "very_high"
+  },
+  {
+   "rank": 61,
+   "country": "Burundi",
+   "iso2": "BI",
+   "score": 60,
+   "category": "high"
+  },
+  {
+   "rank": 62,
+   "country": "Rwanda",
+   "iso2": "RW",
+   "score": 60,
+   "category": "high"
+  },
+  {
+   "rank": 63,
+   "country": "Palestinian Territories",
+   "iso2": "PS",
+   "score": 59,
+   "category": "high"
+  },
+  {
+   "rank": 64,
+   "country": "South Sudan",
+   "iso2": "SS",
+   "score": 58,
+   "category": "high"
+  },
+  {
+   "rank": 65,
+   "country": "Sri Lanka",
+   "iso2": "LK",
+   "score": 56,
+   "category": "high"
+  },
+  {
+   "rank": 66,
+   "country": "Togo",
+   "iso2": "TG",
+   "score": 55,
+   "category": "high"
+  },
+  {
+   "rank": 67,
+   "country": "Guinea",
+   "iso2": "GN",
+   "score": 55,
+   "category": "high"
+  },
+  {
+   "rank": 68,
+   "country": "Bahrain",
+   "iso2": "BH",
+   "score": 54,
+   "category": "high"
+  },
+  {
+   "rank": 69,
+   "country": "Venezuela",
+   "iso2": "VE",
+   "score": 54,
+   "category": "high"
+  },
+  {
+   "rank": 70,
+   "country": "Angola",
+   "iso2": "AO",
+   "score": 54,
+   "category": "high"
+  },
+  {
+   "rank": 71,
+   "country": "Ukraine",
+   "iso2": "UA",
+   "score": 53,
+   "category": "high"
+  },
+  {
+   "rank": 72,
+   "country": "Uganda",
+   "iso2": "UG",
+   "score": 53,
+   "category": "high"
+  },
+  {
+   "rank": 73,
+   "country": "Ivory Coast",
+   "iso2": "CI",
+   "score": 52,
+   "category": "high"
+  },
+  {
+   "rank": 74,
+   "country": "Honduras",
+   "iso2": "HN",
+   "score": 52,
+   "category": "high"
+  },
+  {
+   "rank": 75,
+   "country": "Gambia",
+   "iso2": "GM",
+   "score": 50,
+   "category": "high"
   }
- ]
+ ],
+ "provenance": {
+  "verifiedAgainst": [
+   "https://opendoorsanalytical.org/wp-content/uploads/2026/01/WWL-2026-Table-of-Scores-and-Ranks-50-points-v.2.pdf",
+   "https://opendoors.fi/wp-content/wwl2026-5McnsjV9vC/OD-WWL-2026-Top50-Booklet-web.pdf"
+  ],
+  "verifiedOn": "2026-10-05",
+  "method": "manual diff of all 75 rows against official score table"
+ },
+ "attribution": "\u00a9 Open Doors International"
 }

@@ -1,8 +1,4 @@
-// Feed fetching / parsing / caching (ported from server/feeds.js). Differences from the Express version:
-//  * state lives in Workers KV (binding CACHE) instead of data/cache/*.json
-//  * per-host politeness spacing (robots Crawl-delay) is enforced across isolates with a small KV record
-//  * hashing uses WebCrypto SHA-1 (same ids as the Express app)
-//  * reads never trigger network fetches except for sources that have never been fetched (see getFeedItems)
+// Feed fetching / parsing / caching for Cloudflare Workers KV.
 import { XMLParser } from 'fast-xml-parser';
 import { userAgent, SOURCES, JP } from './config.js';
 import { matchCountries, byName } from './geo.js';
@@ -10,20 +6,20 @@ import { rssItems } from './rss.js';
 import * as sample from './sample.js';
 
 const parser = new XMLParser({ ignoreAttributes: true, processEntities: true, htmlEntities: true, trimValues: true, parseTagValue: false });
+const atomParser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_', processEntities: true, htmlEntities: true, trimValues: true, parseTagValue: false });
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const MAX_GAP_WAIT_MS = 30000; // never hold a request longer than this waiting for a host slot
+const MAX_GAP_WAIT_MS = 30000;
+const KV_WRITE_BUDGET = 700; // soft daily cap (free tier 1000)
 
-// ---------- per-invocation context: { env, ctx, gaps } ----------
 export const makeX = (env, ctx) => ({ env, ctx, gaps: null, gapsDirty: false });
 
-// ---------- polite HTTP: per-host spacing (honours robots Crawl-delay), timeout, size cap ----------
 async function reserveSlot(x, host, minGapMs) {
   if (!x.gaps) x.gaps = (await x.env.CACHE.get('meta:gaps', 'json')) || {};
   const now = Date.now();
   const at = Math.max(now, x.gaps[host] || 0);
   if (at - now > MAX_GAP_WAIT_MS) throw new Error('host throttled (' + host + '), try again later');
-  x.gaps[host] = at + minGapMs; // reserve slot (serialises concurrent callers in this invocation)
-  if (minGapMs >= 10000) x.gapsDirty = true; // only crawl-delay hosts (IMB/NAMB/ICC) are persisted across isolates (saves KV writes)
+  x.gaps[host] = at + minGapMs;
+  if (minGapMs >= 10000) x.gapsDirty = true;
   if (at > now) await sleep(at - now);
 }
 export async function flushGaps(x) {
@@ -31,7 +27,7 @@ export async function flushGaps(x) {
   const now = Date.now();
   for (const h of Object.keys(x.gaps)) if (x.gaps[h] < now - 60000) delete x.gaps[h];
   x.gapsDirty = false;
-  await x.env.CACHE.put('meta:gaps', JSON.stringify(x.gaps), { expirationTtl: 3600 });
+  try { await kvPut(x, 'meta:gaps', JSON.stringify(x.gaps), 3600); } catch (e) { console.error('flushGaps', e.message); }
 }
 async function politeFetch(x, url, minGapMs = 3000, timeoutMs = 20000) {
   await reserveSlot(x, new URL(url).host, minGapMs);
@@ -46,52 +42,108 @@ async function politeFetch(x, url, minGapMs = 3000, timeoutMs = 20000) {
   } finally { clearTimeout(t); }
 }
 
-// ---------- text helpers (identical to Express version) ----------
+// Daily KV write counter (soft budget)
+async function kvPut(x, key, value, ttlSec) {
+  const day = new Date().toISOString().slice(0, 10);
+  const ck = 'meta:writes:' + day;
+  let n = 0;
+  try { n = +(await x.env.CACHE.get(ck)) || 0; } catch {}
+  if (n >= KV_WRITE_BUDGET) { console.error('KV write budget exhausted', n); return false; }
+  const opts = ttlSec ? { expirationTtl: ttlSec } : undefined;
+  await x.env.CACHE.put(key, value, opts);
+  try { await x.env.CACHE.put(ck, String(n + 1), { expirationTtl: 172800 }); } catch {}
+  return true;
+}
+
 const ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', hellip: '…', ndash: '–', mdash: '—', rsquo: '’', lsquo: '‘', ldquo: '“', rdquo: '”' };
 function decode(s) {
   return s.replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(+n)).replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
     .replace(/&([a-z]+);/gi, (m, n) => ENT[n.toLowerCase()] ?? m);
 }
+// Clip BEFORE the WordPress boilerplate regex to avoid ReDoS; use non-backtracking pattern
 export function toText(html) {
   if (html == null) return '';
-  let s = String(html).replace(/<(script|style)[\s\S]*?<\/\1>/gi, ' ').replace(/<\/(p|div|li|br)>/gi, ' ').replace(/<[^>]+>/g, ' ');
-  s = decode(decode(s)); // feeds sometimes double-escape
-  s = s.replace(/<[^>]+>/g, ' ').replace(/The post .* appeared first on .*$/i, '').replace(/\[…\]|\[&#8230;\]/g, '…').replace(/\s+/g, ' ').trim();
+  let s = String(html).slice(0, 8000);
+  s = s.replace(/<(script|style)[\s\S]*?<\/\1>/gi, ' ').replace(/<\/(p|div|li|br)>/gi, ' ').replace(/<[^>]+>/g, ' ');
+  s = decode(decode(s));
+  s = s.replace(/<[^>]+>/g, ' ').slice(0, 2000);
+  s = s.replace(/\s*The post[^]{0,300}?appeared first on[^]{0,300}$/i, '');
+  s = s.replace(/\[…\]|\[&#8230;\]/g, '…').replace(/\s+/g, ' ').trim();
   return s;
 }
 function clip(s, n = 300) { if (s.length <= n) return s; const c = s.slice(0, n); return c.slice(0, c.lastIndexOf(' ') > 150 ? c.lastIndexOf(' ') : n) + '…'; }
+function stripEmails(s) { return String(s || '').replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[email removed]'); }
 async function hash(s) {
   const d = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(String(s)));
   return [...new Uint8Array(d)].map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 12);
 }
 const arr = x => (x == null ? [] : Array.isArray(x) ? x : [x]);
 
+function atomLink(it) {
+  const links = arr(it.link);
+  for (const L of links) {
+    if (typeof L === 'string' && /^https?:/.test(L)) return L;
+    if (L && typeof L === 'object') {
+      const rel = L['@_rel'] || 'alternate';
+      const href = L['@_href'] || '';
+      if ((rel === 'alternate' || !L['@_rel']) && /^https?:/.test(href)) return href;
+    }
+  }
+  return '';
+}
+function atomText(v) {
+  if (v == null) return '';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'object') return v['#text'] || v['@_'] || '';
+  return String(v);
+}
+
 export async function parseRss(xml, src) {
-  let entries = rssItems(xml); // fast path: plain RSS 2.0
-  if (!entries) { // Atom or anything unusual: full XML parse
-    const doc = parser.parse(xml);
-    const ch = doc.rss?.channel || doc.feed;
+  let entries = rssItems(xml);
+  if (!entries) {
+    // Atom / unusual: parse with attributes
+    const doc = atomParser.parse(xml);
+    const ch = doc.rss?.channel || doc.feed || doc['rdf:RDF'];
     if (!ch) throw new Error('not an RSS/Atom feed');
-    entries = arr(ch.item || ch.entry);
+    entries = arr(ch.item || ch.entry).map(it => {
+      const link = typeof it.link === 'string' ? it.link : atomLink(it);
+      const guid = atomText(it.guid) || atomText(it.id) || link;
+      const desc = atomText(it.description) || atomText(it.summary) || atomText(it.content) || atomText(it['content:encoded']);
+      const cats = arr(it.category).map(c => typeof c === 'string' ? c : (c?.['@_term'] || atomText(c))).filter(Boolean);
+      return { title: atomText(it.title), link, guid, pubDate: it.pubDate || it.updated || it.published || it['dc:date'], description: desc, category: cats, 'content:encoded': atomText(it['content:encoded']) };
+    });
   }
   const out = [];
-  for (const it of entries) {
-    const title = toText(it.title);
-    const link = typeof it.link === 'string' ? it.link : (it.guid && String(it.guid).startsWith('http') ? String(it.guid) : '');
+  const now = Date.now();
+  for (const it of entries.slice(0, 40)) {
+    let title = toText(it.title);
+    let link = typeof it.link === 'string' ? it.link.trim() : (it.guid && String(it.guid).startsWith('http') ? String(it.guid).trim() : '');
+    if (src.include && link && !link.includes(src.include)) continue;
     const date = it.pubDate || it.updated || it.published || it['dc:date'];
-    const d = date ? new Date(date) : null;
+    let d = date ? new Date(date) : null;
+    if (d && !isNaN(d) && d.getTime() > now + 86400000) d = null; // clamp future dates
+    // date-only feeds (IMB prayer): stamp is 00:00 UTC — keep calendar date, avoid TZ shift
+    let published = null;
+    if (src.dateOnly && date) {
+      const m = String(date).match(/(\d{4}-\d{2}-\d{2})/);
+      published = m ? m[1] + 'T12:00:00.000Z' : (d && !isNaN(d) ? d.toISOString() : null);
+    } else if (d && !isNaN(d)) published = d.toISOString();
     const tags = arr(it.category).map(toText).filter(Boolean);
-    const excerpt = clip(toText(it.description || it['content:encoded'] || it.summary || ''));
+    let excerpt = '';
+    if (src.excerpt !== false) {
+      excerpt = clip(toText(it.description || it['content:encoded'] || it.summary || ''));
+      if (src.stripEmails) excerpt = stripEmails(excerpt);
+    }
+    if (src.stripEmails) title = stripEmails(title);
     if (!title || !/^https?:\/\//.test(link)) continue;
     const haystack = [title, tags.join(' | '), excerpt].join(' | ');
     out.push({ id: src.id + ':' + await hash(it.guid || link), source: src.id, sourceName: src.name, category: src.category,
-      title, link, published: d && !isNaN(d) ? d.toISOString() : null, excerpt, tags: tags.slice(0, 12), countries: matchCountries(haystack) });
+      title, link, published, excerpt, tags: tags.slice(0, 12), countries: matchCountries(haystack), dateOnly: !!src.dateOnly });
   }
   return out;
 }
 
-// ---------- KV-backed cache + status ----------
-const memRecs = new Map(); // short-lived per-isolate read cache to save KV reads (free tier: 100k reads/day)
+const memRecs = new Map();
 const MEM_TTL_MS = 30000;
 const recKey = id => 'src:' + id.replace(/[^a-z0-9_-]/gi, '_');
 async function loadRec(x, id, { fresh = false } = {}) {
@@ -104,16 +156,17 @@ async function loadRec(x, id, { fresh = false } = {}) {
 }
 async function saveRec(x, id, rec, ttlSec) {
   memRecs.set(id, { at: Date.now(), rec });
-  try { await x.env.CACHE.put(recKey(id), JSON.stringify(rec), ttlSec ? { expirationTtl: ttlSec } : undefined); }
+  try { await kvPut(x, recKey(id), JSON.stringify(rec), ttlSec); }
   catch (e) { console.error('kv write failed', id, e.message); }
 }
 
-const inflight = new Map(); // per-isolate de-dupe
+const inflight = new Map();
 export async function refreshSource(x, src, { force = false } = {}) {
   let rec = await loadRec(x, src.id, { fresh: force });
   const fresh = rec && rec.fetchedAt && Date.now() - rec.fetchedAt < src.ttlMin * 60000;
-  const throttled = force && rec && rec.lastAttempt && Date.now() - rec.lastAttempt < 120000; // never hammer: 2 min floor
-  if ((fresh && !force) || throttled) return rec;
+  const throttled = force && rec && rec.lastAttempt && Date.now() - rec.lastAttempt < 120000;
+  const backingOff = rec && rec.nextTryAt && Date.now() < rec.nextTryAt;
+  if ((fresh && !force) || throttled || (backingOff && !force)) return rec;
   if (inflight.has(src.id)) return inflight.get(src.id);
   const p = (async () => {
     const next = { ...(rec || {}), lastAttempt: Date.now() };
@@ -121,9 +174,26 @@ export async function refreshSource(x, src, { force = false } = {}) {
       const r = await politeFetch(x, src.url, src.minGapMs);
       if (r.status !== 200) throw new Error('HTTP ' + r.status);
       const items = src.special === 'jp' ? await parseJpRss(r.text) : await parseRss(r.text, src);
-      next.items = items; next.fetchedAt = Date.now(); next.error = null;
+      // Don't overwrite last good items with an empty successful fetch
+      if (src.special !== 'jp' && Array.isArray(items) && items.length === 0 && rec?.items?.length) {
+        next.emptyStreak = (rec.emptyStreak || 0) + 1;
+        if (next.emptyStreak < 3 && Date.now() - (rec.fetchedAt || 0) < 86400000) {
+          next.error = 'empty response (kept previous copy)';
+          next.fetchedAt = Date.now();
+          next.fails = 0; delete next.nextTryAt;
+        } else {
+          next.items = items; next.fetchedAt = Date.now(); next.error = null; next.emptyStreak = next.emptyStreak;
+          next.fails = 0; delete next.nextTryAt;
+        }
+      } else {
+        next.items = items; next.fetchedAt = Date.now(); next.error = null; next.emptyStreak = 0;
+        next.fails = 0; delete next.nextTryAt;
+      }
     } catch (e) {
       next.error = (e.name === 'AbortError' ? 'timeout' : e.message);
+      next.fails = (rec?.fails || 0) + 1;
+      const backoff = Math.min(src.ttlMin * 60000, 5 * 60000 * 2 ** Math.min(next.fails - 1, 6));
+      next.nextTryAt = Date.now() + backoff;
     }
     await saveRec(x, src.id, next);
     return next;
@@ -143,40 +213,44 @@ export function statusOf(src, rec) {
   const vis = visibleItems(src, rec);
   const newest = all.map(i => i.published).filter(Boolean).sort().pop() || null;
   let state;
-  if (!rec || (!rec.fetchedAt && rec.error)) state = 'error';
-  else if (rec.error) state = 'cached';          // last refresh failed, serving previous good copy
-  else if (all.length === 0) state = 'empty';    // reachable, publishes no items
-  else if (vis.length === 0) state = 'stale';    // items exist but all older than maxAgeDays
+  if (!rec) state = 'pending';
+  else if (!rec.fetchedAt && rec.error) state = 'error';
+  else if (rec.error && (!all.length || rec.error.startsWith('empty'))) state = rec.error.startsWith('empty') ? 'cached' : 'cached';
+  else if (rec.error) state = 'cached';
+  else if (all.length === 0) state = 'empty';
+  else if (vis.length === 0) state = 'stale';
+  else if (rec.fetchedAt && Date.now() - rec.fetchedAt > 3 * src.ttlMin * 60000) state = 'stale';
   else state = 'ok';
   return { id: src.id, name: src.name, org: src.org, category: src.category, url: src.url, home: src.home, terms: src.terms,
     state, lastOk: rec?.fetchedAt ? new Date(rec.fetchedAt).toISOString() : null, lastAttempt: rec?.lastAttempt ? new Date(rec.lastAttempt).toISOString() : null,
-    error: rec?.error || null, itemsFetched: all.length, itemsShown: vis.length, newestItem: newest };
+    error: rec?.error || null, itemsFetched: all.length, itemsShown: vis.length, newestItem: newest,
+    fails: rec?.fails || 0, nextTryAt: rec?.nextTryAt ? new Date(rec.nextTryAt).toISOString() : null };
 }
 
-// ---------- Joshua Project public RSS ----------
 export async function parseJpRss(xml) {
   const out = { unreached: null, fact: null, scripture: null };
   let entries = rssItems(xml);
   if (!entries) entries = arr(parser.parse(xml).rss?.channel?.item);
   for (const it of entries) {
     const t = toText(it.title), desc = String(it.description || '');
+    const link = String(it.link || '');
+    if (!/^https?:\/\//.test(link) && link) continue;
     if (/^Unreached of the Day/i.test(t)) {
       const f = {};
       for (const line of desc.replace(/<!\[CDATA\[|\]\]>/g, '').split(/<br\s*\/?>/i)) {
         const m = line.match(/^\s*([^:]+):\s*(.*?)\s*$/); if (m) f[m[1].trim().toLowerCase()] = toText(m[2]);
       }
       const c = byName(f['country name']);
-      out.unreached = { title: t.replace(/^Unreached of the Day:\s*/i, ''), link: String(it.link), peopleName: f['people name'], country: f['country name'], iso2: c?.iso2 || null,
+      out.unreached = { title: t.replace(/^Unreached of the Day:\s*/i, ''), link, peopleName: f['people name'], country: f['country name'], iso2: c?.iso2 || null,
         population: f['population'], language: f['primary language'], religion: f['primary religion'], evangelicalPct: f['% evangelical'], status: f['status'], photo: it['media:thumbnail'] || null, published: it.pubDate ? new Date(it.pubDate).toISOString() : null };
-    } else if (/Mission Fact/i.test(t)) out.fact = { text: toText(desc), link: String(it.link) };
-    else if (/Mission Scripture/i.test(t)) out.scripture = { text: toText(desc), link: String(it.link) };
+    } else if (/Mission Fact/i.test(t)) out.fact = { text: toText(desc), link };
+    else if (/Mission Scripture/i.test(t)) out.scripture = { text: toText(desc), link, version: 'ESV' };
   }
   if (!out.unreached) throw new Error('no Unreached of the Day item in feed');
   return out;
 }
 export const JP_SRC = { ...JP, special: 'jp' };
 
-// Optional Joshua Project API (needs free key as the JP_API_KEY secret). Response shape handled defensively; UNTESTED without a key.
 export async function jpApiExtras(x, dateStr) {
   const key = x.env.JP_API_KEY;
   if (!key) return null;
@@ -194,7 +268,8 @@ export async function jpApiExtras(x, dateStr) {
   } catch (e) { console.error('JP API failed:', e.message); return rec?.data || null; }
 }
 
-// ---------- on-demand IMB per-country tag feed (WordPress tag feed) ----------
+// Cap on-demand IMB tag fetches: only WWL countries + daily counter
+const IMB_TAG_DAILY_CAP = 40;
 export async function imbCountryFeed(x, country) {
   const slug = country.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   const id = 'imbtag-' + slug;
@@ -203,22 +278,25 @@ export async function imbCountryFeed(x, country) {
   const rec = await loadRec(x, id);
   if (rec && rec.fetchedAt && Date.now() - rec.fetchedAt < src.ttlMin * 60000) return rec.items || [];
   if (rec && rec.lastAttempt && Date.now() - rec.lastAttempt < 600000) return rec.items || [];
+  // Prefer serving cache; only fetch if WWL-listed or never fetched
+  const { wwlByIso } = await import('./geo.js');
+  if (!wwlByIso[country.iso2] && rec?.items) return rec.items;
+  const day = new Date().toISOString().slice(0, 10);
+  let n = 0;
+  try { n = +(await x.env.CACHE.get('meta:imbTags:' + day)) || 0; } catch {}
+  if (n >= IMB_TAG_DAILY_CAP) return rec?.items || [];
   const next = { ...(rec || {}), lastAttempt: Date.now() };
   try {
     const r = await politeFetch(x, src.url, src.minGapMs);
-    if (r.status === 404) { next.items = []; next.fetchedAt = Date.now(); }
+    if (r.status === 404) { next.items = []; next.fetchedAt = Date.now(); await saveRec(x, id, next, 7 * 86400); }
     else if (r.status !== 200) throw new Error('HTTP ' + r.status);
-    else { next.items = (await parseRss(r.text, { ...src, id: 'imb' })).slice(0, 8); next.fetchedAt = Date.now(); }
-  } catch (e) { next.error = e.message; }
-  await saveRec(x, id, next, 14 * 86400);
+    else { next.items = (await parseRss(r.text, { ...src, id: 'imb', excerpt: true })).slice(0, 8); next.fetchedAt = Date.now(); await saveRec(x, id, next, 14 * 86400); }
+    try { await x.env.CACHE.put('meta:imbTags:' + day, String(n + 1), { expirationTtl: 172800 }); } catch {}
+  } catch (e) { next.error = e.message; await saveRec(x, id, next, 14 * 86400); }
   await flushGaps(x);
   return next.items || [];
 }
 
-// ---------- public API used by routes ----------
-// Reads come from KV. A source that has NEVER been fetched (fresh deploy / empty KV) is fetched in the background
-// via ctx.waitUntil (at most REVALIDATE_MAX per request, and only once per isolate-minute); everything else is kept
-// fresh by the Cron Trigger (see cronRefresh) so page views stay cheap on the free tier (10 ms CPU / request).
 const REVALIDATE_MAX = 2;
 const attempted = new Map();
 async function recsFor(x, list) {
@@ -242,14 +320,15 @@ export async function getFeedItems(x, { cat = 'all', country = null } = {}) {
   if (country) items = items.filter(i => i.countries.includes(country));
   items.sort((a, b) => (b.published || '').localeCompare(a.published || ''));
   let example = false;
-  if (!items.length && !country) { // every source in this category is down/empty -> clearly labelled placeholders
+  if (!items.length && !country) {
     items = sample.items(cat === 'all' ? 'persecution' : cat); example = true;
   }
   return { items, statuses, example };
 }
 function jpStatus(rec) {
   const base = statusOf({ ...JP_SRC }, null);
-  base.state = rec?.items ? (rec.error ? 'cached' : 'ok') : (rec?.error ? 'error' : 'pending');
+  if (!rec) { base.state = 'pending'; return base; }
+  base.state = rec.items ? (rec.error ? 'cached' : (rec.fetchedAt && Date.now() - rec.fetchedAt > 3 * JP.ttlMin * 60000 ? 'stale' : 'ok')) : (rec.error ? 'error' : 'pending');
   base.lastOk = rec?.fetchedAt ? new Date(rec.fetchedAt).toISOString() : null;
   base.lastAttempt = rec?.lastAttempt ? new Date(rec.lastAttempt).toISOString() : null;
   base.error = rec?.error || null; base.itemsFetched = base.itemsShown = rec?.items ? 3 : 0;
@@ -267,8 +346,6 @@ export async function allStatuses(x) {
   return out;
 }
 
-// Refresh sources one after another (CPU-friendly for the free tier). force=true bypasses the TTL (2 min per-source floor still applies).
-// Returns ids of sources attempted. maxSources caps how many are fetched in one invocation.
 export async function refreshAll(x, { force = false, maxSources = Infinity } = {}) {
   const all = [...SOURCES, JP_SRC];
   const recs = await Promise.all(all.map(s => loadRec(x, s.id, { fresh: true })));
@@ -277,8 +354,12 @@ export async function refreshAll(x, { force = false, maxSources = Infinity } = {
     const r = recs[i];
     const age = r && r.fetchedAt ? now - r.fetchedAt : Infinity;
     const recentTry = r && r.lastAttempt && now - r.lastAttempt < 120000;
-    return { s, overdue: age / (s.ttlMin * 60000), skip: recentTry || (!force && age < s.ttlMin * 60000) };
-  }).filter(d => !d.skip).sort((a, b) => b.overdue - a.overdue).slice(0, maxSources);
+    const backingOff = r && r.nextTryAt && now < r.nextTryAt;
+    const skip = recentTry || backingOff || (!force && age < s.ttlMin * 60000);
+    // Prefer due sources that are not backing off; tiebreak by time since lastAttempt so recently-tried go to the back
+    const lastTry = r?.lastAttempt || 0;
+    return { s, overdue: age / (s.ttlMin * 60000), skip, lastTry };
+  }).filter(d => !d.skip).sort((a, b) => b.overdue - a.overdue || a.lastTry - b.lastTry).slice(0, maxSources);
   const done = [];
   try {
     for (const d of due) { await refreshSource(x, d.s, { force }); done.push(d.s.id); }

@@ -1,0 +1,24 @@
+{
+  "id": "/",
+  "name": "SBC Prayer Console",
+  "short_name": "Pray",
+  "description": "Missionary Status & Prayer Console — pray with intention for missionaries, unreached peoples, and the persecuted church. Works offline with cached focus.",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#12263f",
+  "theme_color": "#12263f",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["lifestyle", "education", "productivity"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Today's prayer guide", "short_name": "Today", "url": "/?tab=today&source=pwa", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Our missionaries", "short_name": "Missionaries", "url": "/?tab=church&source=pwa", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}
