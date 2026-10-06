@@ -1,5 +1,7 @@
 # SBC Prayer Console - Cloudflare Worker edition
 
+**Live app:** [https://sbc-prayer-console.sbc-prayer-061d970b.workers.dev](https://sbc-prayer-console.sbc-prayer-061d970b.workers.dev) (installable: Android/Chrome "Install app", iPhone Safari Share > Add to Home Screen)
+
 Port of `sbc-prayer-console` (Express + Leaflet) to a Cloudflare Worker that fits the **Workers Free** plan.
 Deploy steps are in **[DEPLOY.md](DEPLOY.md)**.
 
