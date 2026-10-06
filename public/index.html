@@ -37,19 +37,6 @@
 <div id="privacy-banner" class="privacy-banner" hidden role="status">Presentation mode: sensitive workers are hidden. Turning this off requires confirmation and lasts only for this session.</div>
 
 <main class="layout">
-  <section class="panel" id="panel">
-    <nav class="tabs" role="tablist" aria-label="Prayer console sections" id="tabs">
-      <button role="tab" id="tabbtn-today" aria-controls="view" aria-selected="true" tabindex="0" data-tab="today" class="on">Today</button>
-      <button role="tab" id="tabbtn-country" aria-controls="view" aria-selected="false" tabindex="-1" data-tab="country" hidden>Country</button>
-      <button role="tab" id="tabbtn-persecution" aria-controls="view" aria-selected="false" tabindex="-1" data-tab="persecution">Persecuted Church</button>
-      <button role="tab" id="tabbtn-missions" aria-controls="view" aria-selected="false" tabindex="-1" data-tab="missions">Missions</button>
-      <button role="tab" id="tabbtn-sbc" aria-controls="view" aria-selected="false" tabindex="-1" data-tab="sbc">SBC News</button>
-      <button role="tab" id="tabbtn-prayer" aria-controls="view" aria-selected="false" tabindex="-1" data-tab="prayer">Prayer List <span id="pl-count" class="pill"></span></button>
-      <button role="tab" id="tabbtn-church" aria-controls="view" aria-selected="false" tabindex="-1" data-tab="church">Our Missionaries</button>
-      <button role="tab" id="tabbtn-sources" aria-controls="view" aria-selected="false" tabindex="-1" data-tab="sources">Sources</button>
-    </nav>
-    <div id="view" class="view" role="tabpanel" aria-labelledby="tabbtn-today" tabindex="-1"></div>
-  </section>
 
   <section class="mapwrap" aria-label="World map">
     <div id="map" role="region" aria-label="Interactive map (optional) — a country list is available under Persecuted Church"></div>
@@ -73,6 +60,20 @@
       <span><i class="dot gr"></i>church missionary</span>
       <span><i class="dot pu"></i>unreached of the day</span>
     </div>
+  </section>
+
+  <section class="panel" id="panel">
+    <nav class="tabs" role="tablist" aria-label="Prayer console sections" id="tabs">
+      <button role="tab" id="tabbtn-today" aria-controls="view" aria-selected="true" tabindex="0" data-tab="today" class="on">Today</button>
+      <button role="tab" id="tabbtn-country" aria-controls="view" aria-selected="false" tabindex="-1" data-tab="country" hidden>Country</button>
+      <button role="tab" id="tabbtn-persecution" aria-controls="view" aria-selected="false" tabindex="-1" data-tab="persecution">Persecuted Church</button>
+      <button role="tab" id="tabbtn-missions" aria-controls="view" aria-selected="false" tabindex="-1" data-tab="missions">Missions</button>
+      <button role="tab" id="tabbtn-sbc" aria-controls="view" aria-selected="false" tabindex="-1" data-tab="sbc">SBC News</button>
+      <button role="tab" id="tabbtn-prayer" aria-controls="view" aria-selected="false" tabindex="-1" data-tab="prayer">Prayer List <span id="pl-count" class="pill"></span></button>
+      <button role="tab" id="tabbtn-church" aria-controls="view" aria-selected="false" tabindex="-1" data-tab="church">Our Missionaries</button>
+      <button role="tab" id="tabbtn-sources" aria-controls="view" aria-selected="false" tabindex="-1" data-tab="sources">Sources</button>
+    </nav>
+    <div id="view" class="view" role="tabpanel" aria-labelledby="tabbtn-today" tabindex="-1"></div>
   </section>
 </main>
 

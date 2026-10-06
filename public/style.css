@@ -26,7 +26,7 @@ label.f input,label.f select,label.f textarea{margin-top:.15em;color:var(--ink)}
 .banner{padding:.5rem 1rem;background:#fef3c7;color:#78350f;border-bottom:1px solid #f59e0b;font-size:.9rem}
 .privacy-banner{padding:.4rem 1rem;background:#1e3a5f;color:#e2e8f0;font-size:.85rem;border-bottom:1px solid #35557f}
 .error-panel{padding:1rem;background:#fef2f2;border:1px solid #fecaca;border-radius:10px;color:#7f1d1d}
-.layout{display:grid;grid-template-columns:minmax(360px,1fr) minmax(0,1.2fr);gap:.8rem;padding:.8rem;height:calc(100vh - 130px);min-height:560px}
+.layout{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(360px,1fr);gap:.8rem;padding:.8rem;height:calc(100vh - 130px);min-height:560px}
 .mapwrap{position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:#cfe3f1;touch-action:pan-y}
 #map{position:absolute;inset:0;touch-action:pan-y}
 #map.map-active{touch-action:none}
@@ -70,8 +70,8 @@ table{border-collapse:collapse;width:100%;font-size:.85em}td,th{border-bottom:1p
 #toast{position:fixed;left:50%;bottom:1.2rem;transform:translateX(-50%);background:#111827;color:#fff;padding:.5rem 1rem;border-radius:8px;z-index:9999;max-width:90vw;display:none}
 @media (max-width:900px){
   .layout{grid-template-columns:1fr;height:auto;display:flex;flex-direction:column}
-  .panel{order:1;min-height:50vh}
-  .mapwrap{order:2;height:35vh;min-height:220px}
+  .mapwrap{order:1;height:45vh;min-height:280px}
+  .panel{order:2;min-height:50vh}
   .map-activate{display:block}
   .mapwrap.map-on .map-activate{display:none}
   .layers{max-width:160px}

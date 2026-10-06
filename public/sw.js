@@ -4,7 +4,7 @@
    - /api/*: network-first, cache last good GET responses for offline
    - Never cache POST (or any non-GET)
 */
-const CACHE_VERSION = 'spc-v0.2.0';
+const CACHE_VERSION = 'spc-v0.2.1';
 const SHELL = [
   '/',
   '/index.html',
