@@ -43,10 +43,10 @@ Keep `binding = "CACHE"` exactly; the code uses `env.CACHE`.
 ```bash
 npx wrangler deploy
 ```
-Wrangler uploads `public/` as static assets, publishes the Worker, creates the Cron Trigger (every 5 minutes) and prints the URL, e.g. `https://sbc-prayer-console.<account-subdomain>.workers.dev`.
+Wrangler uploads `public/` as static assets, publishes the Worker, creates the Cron Trigger (every 15 minutes, at :07/:22/:37/:52) and prints the URL, e.g. `https://sbc-prayer-console.<account-subdomain>.workers.dev`.
 
 ## 6. Warm the cache and check it
-The first cron runs within 5 minutes and then fetches one source per run. To fill the cache immediately:
+The first cron runs within 15 minutes and then fetches one source per run. To fill the cache immediately:
 ```bash
 URL=https://sbc-prayer-console.<account-subdomain>.workers.dev
 curl $URL/api/health
@@ -70,14 +70,14 @@ npx wrangler deploy
 To turn off the `*.workers.dev` address afterwards add `workers_dev = false`.
 
 ## Updating later
-Edit files, then `npx wrangler deploy` again. Local test: `npx wrangler dev` (http://localhost:8787; uses a local simulated KV, no login needed) and, in another terminal, trigger the cron with `curl 'http://localhost:8787/__scheduled?cron=*/5+*+*+*+*'` (needs `npx wrangler dev --test-scheduled`).
+Edit files, then `npx wrangler deploy` again. Local test: `npx wrangler dev` (http://localhost:8787; uses a local simulated KV, no login needed) and, in another terminal, trigger the cron with `curl 'http://localhost:8787/__scheduled?cron=7,22,37,52+*+*+*+*'` (needs `npx wrangler dev --test-scheduled`).
 
 ## Free-plan limits this project is designed around
 | Limit (Workers Free) | How it is respected |
 |---|---|
 | 10 ms CPU per invocation | Page views only read KV (no parsing). Each cron run refreshes **one** source (`CRON_MAX_SOURCES`, default 1); `POST /api/refresh` refreshes up to 2 (`REFRESH_MAX_SOURCES`). A lean regex RSS extractor is used instead of building a full XML tree. |
 | 50 subrequests per invocation | A request touches at most ~10 KV reads + a few fetches. |
-| KV 1,000 writes/day | About 250-350 writes/day (one per source refresh, plus a throttle record for the Crawl-delay hosts). |
+| KV 1,000 writes/day | About 65-80 writes/day: one per source refresh (cron every 15 min, TTLs 90 min-12 h), no separate counter key, and cron runs keep the Crawl-delay spacing in memory. Page-view IMB country lookups add 2 writes each (max 40/day). A soft 700/day cap rides inside the saved records. |
 | KV 100,000 reads/day | 30-second per-isolate read cache; ~35 reads per full page load -> ~2,500+ page loads/day. |
 | 5 Cron Triggers | Uses 1. |
 

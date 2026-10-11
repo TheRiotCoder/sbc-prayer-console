@@ -1,3 +1,4 @@
+var __defProp = Object.defineProperty;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __esm = (fn, res, err) => function __init() {
   if (err) throw err[0];
@@ -6,6 +7,10 @@ var __esm = (fn, res, err) => function __init() {
   } catch (e) {
     throw err = [e], e;
   }
+};
+var __export = (target, all2) => {
+  for (var name in all2)
+    __defProp(target, name, { get: all2[name], enumerable: true });
 };
 
 // src/data/wwl2026.json
@@ -567,6 +572,14 @@ var init_countries = __esm({
 });
 
 // src/geo.js
+var geo_exports = {};
+__export(geo_exports, {
+  byName: () => byName,
+  countries: () => countries,
+  matchCountries: () => matchCountries,
+  wwlByIso: () => wwlByIso,
+  wwlFile: () => wwl2026_default
+});
 function push(iso2, src, flags, needle, ci) {
   matchers.push({ iso2, src, flags, rx: null, needle, ci: !!ci });
 }
@@ -4894,7 +4907,7 @@ var SOURCES = [
     category: "missions",
     url: "https://www.imb.org/feed/",
     home: "https://www.imb.org/",
-    ttlMin: 60,
+    ttlMin: 120,
     minGapMs: 1e4,
     maxAgeDays: 400,
     excerpt: true,
@@ -4907,7 +4920,7 @@ var SOURCES = [
     category: "missions",
     url: "https://www.namb.net/feed/?post_type=news",
     home: "https://www.namb.net/",
-    ttlMin: 60,
+    ttlMin: 180,
     minGapMs: 1e4,
     maxAgeDays: 400,
     excerpt: false,
@@ -4920,7 +4933,7 @@ var SOURCES = [
     category: "missions",
     url: "https://www.namb.net/feed/?post_type=guide",
     home: "https://www.namb.net/resources/pray/",
-    ttlMin: 180,
+    ttlMin: 720,
     minGapMs: 1e4,
     maxAgeDays: 800,
     excerpt: false,
@@ -4933,7 +4946,7 @@ var SOURCES = [
     category: "sbc",
     url: "https://www.baptistpress.com/resource-library/feed/",
     home: "https://www.baptistpress.com/",
-    ttlMin: 30,
+    ttlMin: 120,
     minGapMs: 5e3,
     maxAgeDays: 400,
     excerpt: false,
@@ -4947,7 +4960,7 @@ var SOURCES = [
     category: "sbc",
     url: "https://www.sbc.net/resource-library/feed/",
     home: "https://www.sbc.net/",
-    ttlMin: 120,
+    ttlMin: 360,
     minGapMs: 4e3,
     maxAgeDays: 400,
     excerpt: true,
@@ -4960,7 +4973,7 @@ var SOURCES = [
     category: "persecution",
     url: "https://persecution.org/feed/",
     home: "https://www.persecution.org/",
-    ttlMin: 30,
+    ttlMin: 90,
     minGapMs: 1e4,
     maxAgeDays: 120,
     excerpt: true,
@@ -4973,7 +4986,7 @@ var SOURCES = [
     category: "persecution",
     url: "https://morningstarnews.org/feed/",
     home: "https://morningstarnews.org/",
-    ttlMin: 30,
+    ttlMin: 120,
     minGapMs: 5e3,
     maxAgeDays: 120,
     excerpt: true,
@@ -4986,7 +4999,7 @@ var SOURCES = [
     category: "persecution",
     url: "https://voiceofpersecutedchristians.org/feed/",
     home: "https://voiceofpersecutedchristians.org/",
-    ttlMin: 120,
+    ttlMin: 360,
     minGapMs: 5e3,
     maxAgeDays: 400,
     excerpt: false,
@@ -5000,7 +5013,7 @@ var JP = {
   category: "prayer",
   url: "https://joshuaproject.net/rss",
   home: "https://joshuaproject.net/",
-  ttlMin: 180,
+  ttlMin: 240,
   minGapMs: 5e3,
   terms: 'Public RSS. Required attribution: "Data provided by Joshua Project" with hyperlink. Non-commercial; do not replicate their site. Optional JP_API_KEY enables richer fields.'
 };
@@ -5074,8 +5087,20 @@ var atomParser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "
 var sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 var MAX_GAP_WAIT_MS = 3e4;
 var KV_WRITE_BUDGET = 700;
+var KV_WRITES_PER_INVOCATION = 12;
+var makeX = (env, ctx, opts = {}) => ({ env, ctx, gaps: null, gapsDirty: false, writes: 0, persistGaps: !opts.cron });
+async function loadGaps(x) {
+  if (!x.gaps) {
+    try {
+      x.gaps = await x.env.CACHE.get("meta:gaps", "json") || {};
+    } catch {
+      x.gaps = {};
+    }
+  }
+  return x.gaps;
+}
 async function reserveSlot(x, host, minGapMs) {
-  if (!x.gaps) x.gaps = await x.env.CACHE.get("meta:gaps", "json") || {};
+  await loadGaps(x);
   const now = Date.now();
   const at = Math.max(now, x.gaps[host] || 0);
   if (at - now > MAX_GAP_WAIT_MS) throw new Error("host throttled (" + host + "), try again later");
@@ -5084,12 +5109,12 @@ async function reserveSlot(x, host, minGapMs) {
   if (at > now) await sleep(at - now);
 }
 async function flushGaps(x) {
-  if (!x.gaps || !x.gapsDirty) return;
+  if (!x.gaps || !x.gapsDirty || !x.persistGaps) return;
   const now = Date.now();
-  for (const h of Object.keys(x.gaps)) if (x.gaps[h] < now - 6e4) delete x.gaps[h];
+  for (const h of Object.keys(x.gaps)) if (h[0] !== "#" && x.gaps[h] < now - 6e4) delete x.gaps[h];
   x.gapsDirty = false;
   try {
-    await kvPut(x, "meta:gaps", JSON.stringify(x.gaps), 3600);
+    await kvPut(x, "meta:gaps", JSON.stringify(x.gaps), 172800);
   } catch (e) {
     console.error("flushGaps", e.message);
   }
@@ -5111,24 +5136,44 @@ async function politeFetch(x, url, minGapMs = 3e3, timeoutMs = 2e4) {
     clearTimeout(t);
   }
 }
-async function kvPut(x, key, value, ttlSec) {
-  const day = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-  const ck = "meta:writes:" + day;
-  let n = 0;
-  try {
-    n = +await x.env.CACHE.get(ck) || 0;
-  } catch {
+var today = () => (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+var wc = { d: "", n: 0 };
+function noteWrites(stamp) {
+  if (!stamp || typeof stamp.n !== "number") return;
+  const d = today();
+  if (stamp.d !== d) return;
+  if (wc.d !== d) {
+    wc.d = d;
+    wc.n = 0;
   }
-  if (n >= KV_WRITE_BUDGET) {
-    console.error("KV write budget exhausted", n);
+  if (stamp.n > wc.n) wc.n = stamp.n;
+}
+function writesToday() {
+  return wc.d === today() ? wc.n : 0;
+}
+function _resetWriteCounter() {
+  wc.d = "";
+  wc.n = 0;
+}
+async function kvPut(x, key, value, ttlSec) {
+  const d = today();
+  if (wc.d !== d) {
+    wc.d = d;
+    wc.n = 0;
+  }
+  if (wc.n >= KV_WRITE_BUDGET) {
+    console.error("KV write budget exhausted", wc.n);
+    return false;
+  }
+  if ((x.writes || 0) >= KV_WRITES_PER_INVOCATION) {
+    console.error("KV per-invocation write cap hit", key);
     return false;
   }
   const opts = ttlSec ? { expirationTtl: ttlSec } : void 0;
+  if (typeof value === "function") value = value(wc.n + 1);
   await x.env.CACHE.put(key, value, opts);
-  try {
-    await x.env.CACHE.put(ck, String(n + 1), { expirationTtl: 172800 });
-  } catch {
-  }
+  wc.n++;
+  x.writes = (x.writes || 0) + 1;
   return true;
 }
 var ENT2 = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", hellip: "\u2026", ndash: "\u2013", mdash: "\u2014", rsquo: "\u2019", lsquo: "\u2018", ldquo: "\u201C", rdquo: "\u201D" };
@@ -5241,13 +5286,17 @@ async function loadRec(x, id, { fresh = false } = {}) {
   } catch (e) {
     console.error("kv read failed", id, e.message);
   }
+  if (rec && rec._w) noteWrites(rec._w);
   memRecs.set(id, { at: Date.now(), rec });
   return rec;
 }
 async function saveRec(x, id, rec, ttlSec) {
   memRecs.set(id, { at: Date.now(), rec });
   try {
-    await kvPut(x, recKey(id), JSON.stringify(rec), ttlSec);
+    await kvPut(x, recKey(id), (n) => {
+      rec._w = { d: today(), n };
+      return JSON.stringify(rec);
+    }, ttlSec);
   } catch (e) {
     console.error("kv write failed", id, e.message);
   }
@@ -5292,7 +5341,8 @@ async function refreshSource(x, src, { force = false } = {}) {
     } catch (e) {
       next.error = e.name === "AbortError" ? "timeout" : e.message;
       next.fails = (rec?.fails || 0) + 1;
-      const backoff = Math.min(src.ttlMin * 6e4, 5 * 6e4 * 2 ** Math.min(next.fails - 1, 6));
+      const cap = next.fails >= 12 ? Math.max(src.ttlMin, 360) * 6e4 : src.ttlMin * 6e4;
+      const backoff = next.fails >= 12 ? cap : Math.min(cap, 5 * 6e4 * 2 ** Math.min(next.fails - 1, 6));
       next.nextTryAt = Date.now() + backoff;
     }
     await saveRec(x, src.id, next);
@@ -5375,6 +5425,54 @@ async function parseJpRss(xml) {
   return out;
 }
 var JP_SRC = { ...JP, special: "jp" };
+var IMB_TAG_DAILY_CAP = 40;
+async function imbCountryFeed(x, country) {
+  const slug = country.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const id = "imbtag-" + slug;
+  const src = {
+    id,
+    name: 'IMB stories tagged "' + country.name + '"',
+    org: "IMB",
+    category: "missions",
+    ttlMin: 360,
+    minGapMs: 1e4,
+    maxAgeDays: 800,
+    url: `https://www.imb.org/tag/${slug}/feed/`,
+    home: `https://www.imb.org/tag/${slug}/`,
+    terms: "IMB tag feed (WordPress), on demand, cached 6 h, 10 s spacing."
+  };
+  const rec = await loadRec(x, id);
+  if (rec && rec.fetchedAt && Date.now() - rec.fetchedAt < src.ttlMin * 6e4) return rec.items || [];
+  if (rec && rec.lastAttempt && Date.now() - rec.lastAttempt < 6e5) return rec.items || [];
+  const { wwlByIso: wwlByIso2 } = await Promise.resolve().then(() => (init_geo(), geo_exports));
+  if (!wwlByIso2[country.iso2] && rec?.items) return rec.items;
+  const day = today();
+  const g = await loadGaps(x);
+  const [cd, cn] = String(g["#imb"] || "").split("|");
+  const n = cd === day ? +cn || 0 : 0;
+  if (n >= IMB_TAG_DAILY_CAP) return rec?.items || [];
+  const next = { ...rec || {}, lastAttempt: Date.now() };
+  try {
+    const r = await politeFetch(x, src.url, src.minGapMs);
+    if (r.status === 404) {
+      next.items = [];
+      next.fetchedAt = Date.now();
+      await saveRec(x, id, next, 7 * 86400);
+    } else if (r.status !== 200) throw new Error("HTTP " + r.status);
+    else {
+      next.items = (await parseRss(r.text, { ...src, id: "imb", excerpt: true })).slice(0, 8);
+      next.fetchedAt = Date.now();
+      await saveRec(x, id, next, 14 * 86400);
+    }
+    x.gaps["#imb"] = day + "|" + (n + 1);
+    x.gapsDirty = true;
+  } catch (e) {
+    next.error = e.message;
+    await saveRec(x, id, next, 14 * 86400);
+  }
+  await flushGaps(x);
+  return next.items || [];
+}
 async function refreshAll(x, { force = false, maxSources = Infinity } = {}) {
   const all2 = [...SOURCES, JP_SRC];
   const recs = await Promise.all(all2.map((s) => loadRec(x, s.id, { fresh: true })));
@@ -5401,15 +5499,24 @@ async function refreshAll(x, { force = false, maxSources = Infinity } = {}) {
 }
 export {
   JP,
+  KV_WRITES_PER_INVOCATION,
+  KV_WRITE_BUDGET,
   SOURCES,
+  _resetWriteCounter,
   countries,
+  flushGaps,
+  imbCountryFeed,
+  makeX,
   matchCountries,
+  noteWrites,
   parseRss,
   refreshAll,
+  refreshSource,
   rssItems,
   statusOf,
   toText,
   visibleItems,
+  writesToday,
   wwlByIso,
   wwl2026_default as wwlFile
 };

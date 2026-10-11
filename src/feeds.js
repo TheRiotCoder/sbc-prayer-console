@@ -9,12 +9,19 @@ const parser = new XMLParser({ ignoreAttributes: true, processEntities: true, ht
 const atomParser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_', processEntities: true, htmlEntities: true, trimValues: true, parseTagValue: false });
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const MAX_GAP_WAIT_MS = 30000;
-const KV_WRITE_BUDGET = 700; // soft daily cap (free tier 1000)
+export const KV_WRITE_BUDGET = 700; // soft daily cap (free tier 1000)
+export const KV_WRITES_PER_INVOCATION = 12; // hard per-invocation cap (a cron run normally does 1)
 
-export const makeX = (env, ctx) => ({ env, ctx, gaps: null, gapsDirty: false });
+// opts.cron: scheduled run. Cron runs keep host spacing in memory only (the next run is 15 min away, far longer than any
+// Crawl-delay), so they never spend a KV write on meta:gaps.
+export const makeX = (env, ctx, opts = {}) => ({ env, ctx, gaps: null, gapsDirty: false, writes: 0, persistGaps: !opts.cron });
 
+async function loadGaps(x) {
+  if (!x.gaps) { try { x.gaps = (await x.env.CACHE.get('meta:gaps', 'json')) || {}; } catch { x.gaps = {}; } }
+  return x.gaps;
+}
 async function reserveSlot(x, host, minGapMs) {
-  if (!x.gaps) x.gaps = (await x.env.CACHE.get('meta:gaps', 'json')) || {};
+  await loadGaps(x);
   const now = Date.now();
   const at = Math.max(now, x.gaps[host] || 0);
   if (at - now > MAX_GAP_WAIT_MS) throw new Error('host throttled (' + host + '), try again later');
@@ -23,11 +30,12 @@ async function reserveSlot(x, host, minGapMs) {
   if (at > now) await sleep(at - now);
 }
 export async function flushGaps(x) {
-  if (!x.gaps || !x.gapsDirty) return;
+  if (!x.gaps || !x.gapsDirty || !x.persistGaps) return;
   const now = Date.now();
-  for (const h of Object.keys(x.gaps)) if (x.gaps[h] < now - 60000) delete x.gaps[h];
+  // keys starting with '#' are small counters riding along in this record (e.g. '#imb' = IMB tag fetches today)
+  for (const h of Object.keys(x.gaps)) if (h[0] !== '#' && x.gaps[h] < now - 60000) delete x.gaps[h];
   x.gapsDirty = false;
-  try { await kvPut(x, 'meta:gaps', JSON.stringify(x.gaps), 3600); } catch (e) { console.error('flushGaps', e.message); }
+  try { await kvPut(x, 'meta:gaps', JSON.stringify(x.gaps), 172800); } catch (e) { console.error('flushGaps', e.message); }
 }
 async function politeFetch(x, url, minGapMs = 3000, timeoutMs = 20000) {
   await reserveSlot(x, new URL(url).host, minGapMs);
@@ -42,16 +50,32 @@ async function politeFetch(x, url, minGapMs = 3000, timeoutMs = 20000) {
   } finally { clearTimeout(t); }
 }
 
-// Daily KV write counter (soft budget)
+// KV write budget without a counter key. The old version read+wrote 'meta:writes:<day>' on every put, which doubled
+// every write. Now the running daily count lives in memory (per isolate) and rides along inside each source record we
+// save anyway (rec._w = { d: day, n }). Every cron run loads all source records, so it recovers the day's count from
+// the newest _w at no extra cost. Writes made by page-view paths in other isolates are only folded in when that isolate
+// next saves a source record, so the count is a close lower bound; those paths have their own caps (IMB tags 40/day,
+// refresh token + 60 s throttle, background fill only for never-fetched sources). Plus a hard per-invocation cap.
+const today = () => new Date().toISOString().slice(0, 10);
+const wc = { d: '', n: 0 };
+export function noteWrites(stamp) { // fold a persisted { d, n } into the in-memory daily count
+  if (!stamp || typeof stamp.n !== 'number') return;
+  const d = today();
+  if (stamp.d !== d) return;
+  if (wc.d !== d) { wc.d = d; wc.n = 0; }
+  if (stamp.n > wc.n) wc.n = stamp.n;
+}
+export function writesToday() { return wc.d === today() ? wc.n : 0; }
+export function _resetWriteCounter() { wc.d = ''; wc.n = 0; }
 async function kvPut(x, key, value, ttlSec) {
-  const day = new Date().toISOString().slice(0, 10);
-  const ck = 'meta:writes:' + day;
-  let n = 0;
-  try { n = +(await x.env.CACHE.get(ck)) || 0; } catch {}
-  if (n >= KV_WRITE_BUDGET) { console.error('KV write budget exhausted', n); return false; }
+  const d = today();
+  if (wc.d !== d) { wc.d = d; wc.n = 0; }
+  if (wc.n >= KV_WRITE_BUDGET) { console.error('KV write budget exhausted', wc.n); return false; }
+  if ((x.writes || 0) >= KV_WRITES_PER_INVOCATION) { console.error('KV per-invocation write cap hit', key); return false; }
   const opts = ttlSec ? { expirationTtl: ttlSec } : undefined;
+  if (typeof value === 'function') value = value(wc.n + 1); // lets saveRec embed the post-write count
   await x.env.CACHE.put(key, value, opts);
-  try { await x.env.CACHE.put(ck, String(n + 1), { expirationTtl: 172800 }); } catch {}
+  wc.n++; x.writes = (x.writes || 0) + 1;
   return true;
 }
 
@@ -151,12 +175,13 @@ async function loadRec(x, id, { fresh = false } = {}) {
   if (!fresh && m && Date.now() - m.at < MEM_TTL_MS) return m.rec;
   let rec = null;
   try { rec = await x.env.CACHE.get(recKey(id), 'json'); } catch (e) { console.error('kv read failed', id, e.message); }
+  if (rec && rec._w) noteWrites(rec._w);
   memRecs.set(id, { at: Date.now(), rec });
   return rec;
 }
 async function saveRec(x, id, rec, ttlSec) {
   memRecs.set(id, { at: Date.now(), rec });
-  try { await kvPut(x, recKey(id), JSON.stringify(rec), ttlSec); }
+  try { await kvPut(x, recKey(id), n => { rec._w = { d: today(), n }; return JSON.stringify(rec); }, ttlSec); }
   catch (e) { console.error('kv write failed', id, e.message); }
 }
 
@@ -192,7 +217,10 @@ export async function refreshSource(x, src, { force = false } = {}) {
     } catch (e) {
       next.error = (e.name === 'AbortError' ? 'timeout' : e.message);
       next.fails = (rec?.fails || 0) + 1;
-      const backoff = Math.min(src.ttlMin * 60000, 5 * 60000 * 2 ** Math.min(next.fails - 1, 6));
+      // Normal cap = the source's TTL; a source that has failed 12+ times in a row (e.g. a site blocking us for days)
+      // is retried at most every 6 h, which spares both the publisher and our KV write budget.
+      const cap = next.fails >= 12 ? Math.max(src.ttlMin, 360) * 60000 : src.ttlMin * 60000;
+      const backoff = next.fails >= 12 ? cap : Math.min(cap, 5 * 60000 * 2 ** Math.min(next.fails - 1, 6));
       next.nextTryAt = Date.now() + backoff;
     }
     await saveRec(x, src.id, next);
@@ -281,9 +309,11 @@ export async function imbCountryFeed(x, country) {
   // Prefer serving cache; only fetch if WWL-listed or never fetched
   const { wwlByIso } = await import('./geo.js');
   if (!wwlByIso[country.iso2] && rec?.items) return rec.items;
-  const day = new Date().toISOString().slice(0, 10);
-  let n = 0;
-  try { n = +(await x.env.CACHE.get('meta:imbTags:' + day)) || 0; } catch {}
+  // Daily counter rides inside meta:gaps (written anyway after an imb.org fetch) instead of its own key.
+  const day = today();
+  const g = await loadGaps(x);
+  const [cd, cn] = String(g['#imb'] || '').split('|');
+  const n = cd === day ? (+cn || 0) : 0;
   if (n >= IMB_TAG_DAILY_CAP) return rec?.items || [];
   const next = { ...(rec || {}), lastAttempt: Date.now() };
   try {
@@ -291,7 +321,7 @@ export async function imbCountryFeed(x, country) {
     if (r.status === 404) { next.items = []; next.fetchedAt = Date.now(); await saveRec(x, id, next, 7 * 86400); }
     else if (r.status !== 200) throw new Error('HTTP ' + r.status);
     else { next.items = (await parseRss(r.text, { ...src, id: 'imb', excerpt: true })).slice(0, 8); next.fetchedAt = Date.now(); await saveRec(x, id, next, 14 * 86400); }
-    try { await x.env.CACHE.put('meta:imbTags:' + day, String(n + 1), { expirationTtl: 172800 }); } catch {}
+    x.gaps['#imb'] = day + '|' + (n + 1); x.gapsDirty = true;
   } catch (e) { next.error = e.message; await saveRec(x, id, next, 14 * 86400); }
   await flushGaps(x);
   return next.items || [];

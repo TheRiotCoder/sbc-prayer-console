@@ -18,11 +18,13 @@ binding = "CACHE"
 id = "c265cebd0507423fb248a3eea0c5b47b"
 
 # --- Cron Trigger: refresh feeds. Each run refreshes only the single most-overdue source (CRON_MAX_SOURCES=1) and only
-# if that source is past its own TTL (30-180 min), so upstream sites are never hit more often than their TTL / Crawl-delay.
-# Why every 5 min instead of 30: the free plan allows 10 ms CPU per invocation, so one source per run; 8 sources whose TTLs add
-# up to ~9 refreshes/hour need >= 10 runs/hour. On the Paid plan you can use "*/30 * * * *" with CRON_MAX_SOURCES = "8".
+# if that source is past its own TTL (90 min - 12 h, see src/config.js), so upstream sites are never hit more often than their
+# TTL / Crawl-delay. Every 15 min (offset from the top of the hour) = 4 runs/hour, which covers the ~3.3 refreshes/hour the
+# TTLs add up to. One source per run because the free plan allows 10 ms CPU per invocation (a cold parse is ~7-11 ms).
+# Each refresh costs one KV write, so this is ~80 writes/day of the free 1,000. On the Paid plan you can use
+# "*/30 * * * *" with CRON_MAX_SOURCES = "10".
 [triggers]
-crons = ["*/5 * * * *"]
+crons = ["7,22,37,52 * * * *"]
 
 [vars]
 TZ = "America/Chicago"          # default "today" for /api/today when no ?date= is given

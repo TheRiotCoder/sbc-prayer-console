@@ -9,7 +9,9 @@
     "deploy": "wrangler deploy",
     "build:data": "node scripts/build-countries.mjs",
     "check": "node --check src/index.js && node --check public/app.js",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "bundle:test": "esbuild test/bundle-entry.js --bundle --platform=node --format=esm --outfile=test/bundle.mjs --log-level=warning",
+    "pretest": "npm run bundle:test"
   },
   "dependencies": {
     "fast-xml-parser": "^5.11.2"

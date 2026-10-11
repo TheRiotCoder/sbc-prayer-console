@@ -249,7 +249,7 @@ export default {
   },
 
   async scheduled(event, env, ctx) {
-    const x = makeX(env, ctx);
+    const x = makeX(env, ctx, { cron: true });
     const max = +env.CRON_MAX_SOURCES || 1;
     try {
       const done = await feeds.refreshAll(x, { force: false, maxSources: max });
